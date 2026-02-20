@@ -1,0 +1,55 @@
+import { loadCredentials, saveCredentials } from './credentials.js';
+export function getBaseUrl() {
+    return process.env.ORIZU_BASE_URL || 'http://localhost:3000';
+}
+function isExpired(expiresAt) {
+    const nowUnix = Math.floor(Date.now() / 1000);
+    return expiresAt <= nowUnix + 30;
+}
+async function refreshCredentials(credentials) {
+    const response = await fetch(`${credentials.baseUrl}/api/cli/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: credentials.refreshToken }),
+    });
+    if (!response.ok) {
+        throw new Error('Session expired. Run `orizu login` again.');
+    }
+    const data = await response.json();
+    const refreshed = {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        expiresAt: data.expiresAt,
+        baseUrl: credentials.baseUrl,
+    };
+    saveCredentials(refreshed);
+    return refreshed;
+}
+export async function authedFetch(path, init = {}) {
+    const credentials = loadCredentials();
+    if (!credentials) {
+        throw new Error('Not logged in. Run `orizu login` first.');
+    }
+    let activeCredentials = credentials;
+    if (isExpired(activeCredentials.expiresAt)) {
+        activeCredentials = await refreshCredentials(activeCredentials);
+    }
+    let response = await fetch(`${activeCredentials.baseUrl}${path}`, {
+        ...init,
+        headers: {
+            ...(init.headers || {}),
+            Authorization: `Bearer ${activeCredentials.accessToken}`,
+        },
+    });
+    if (response.status === 401) {
+        activeCredentials = await refreshCredentials(activeCredentials);
+        response = await fetch(`${activeCredentials.baseUrl}${path}`, {
+            ...init,
+            headers: {
+                ...(init.headers || {}),
+                Authorization: `Bearer ${activeCredentials.accessToken}`,
+            },
+        });
+    }
+    return response;
+}

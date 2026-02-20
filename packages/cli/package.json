@@ -1,0 +1,12 @@
+{
+  "name": "orizu",
+  "version": "0.0.2",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "orizu": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}
