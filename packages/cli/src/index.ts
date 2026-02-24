@@ -8,6 +8,7 @@ import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'process'
 import { clearServerCredentials, getServerCredentials, saveServerCredentials } from './credentials.js'
 import { parseDatasetFile } from './file-parser.js'
+import { parseDatasetReference } from './dataset-download.js'
 import { parseGlobalFlags } from './global-flags.js'
 import { authedFetch, getBaseUrl, setGlobalFlags } from './http.js'
 import { LoginResponse } from './types.js'
@@ -51,6 +52,19 @@ interface AppSummary {
   projectName: string
 }
 
+interface DatasetSummary {
+  id: string
+  name: string
+  rowCount: number
+  sourceType: string
+  createdAt: string
+  projectId: string
+  projectName: string
+  projectSlug: string
+  teamName: string
+  teamSlug: string
+}
+
 interface TeamMember {
   id: string
   user_id: string | null
@@ -92,7 +106,7 @@ interface TaskStatusPayload {
 }
 
 function printUsage() {
-  console.log(`orizu global options:\n\n  --local                 Use http://localhost:3000\n  --server <url>          Use a specific server origin (for example: https://preview.example.com)\n\norizu commands:\n\n  orizu login\n  orizu logout\n  orizu whoami\n  orizu teams list\n  orizu teams create [--name <name>]\n  orizu teams members list [--team <teamSlug>]\n  orizu teams members add --email <email> [--team <teamSlug>]\n  orizu teams members remove --email <email> [--team <teamSlug>]\n  orizu teams members role --team <teamSlug> --email <email> --role <admin|member>\n  orizu projects list [--team <teamSlug>]\n  orizu projects create --name <name> [--team <teamSlug>]\n  orizu apps list [--project <team/project>]\n  orizu apps create --project <team/project> --name <name> --dataset <datasetId> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps update [--app <appId>] [--project <team/project>] --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps link-dataset --dataset <datasetId> [--app <appId>] [--project <team/project>] [--version <n>]\n  orizu tasks list [--project <team/project>]\n  orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> --assignees <userId1,userId2> [--instructions <text>] [--labels-per-item <n>]\n  orizu tasks assign --task <taskId> --assignees <userId1,userId2>\n  orizu tasks status --task <taskId> [--json]\n  orizu datasets upload --file <path> [--project <team/project>] [--name <name>]\n  orizu tasks export [--task <taskId>] [--format <csv|json|jsonl>] [--out <path>]`)
+  console.log(`orizu global options:\n\n  --local                 Use http://localhost:3000\n  --server <url>          Use a specific server origin (for example: https://preview.example.com)\n\norizu commands:\n\n  orizu login\n  orizu logout\n  orizu whoami\n  orizu teams list\n  orizu teams create [--name <name>]\n  orizu teams members list [--team <teamSlug>]\n  orizu teams members add --email <email> [--team <teamSlug>]\n  orizu teams members remove --email <email> [--team <teamSlug>]\n  orizu teams members role --team <teamSlug> --email <email> --role <admin|member>\n  orizu projects list [--team <teamSlug>]\n  orizu projects create --name <name> [--team <teamSlug>]\n  orizu apps list [--project <team/project>]\n  orizu apps create --project <team/project> --name <name> --dataset <datasetId> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps update [--app <appId>] [--project <team/project>] --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps link-dataset --dataset <datasetId> [--app <appId>] [--project <team/project>] [--version <n>]\n  orizu tasks list [--project <team/project>]\n  orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> --assignees <userId1,userId2> [--instructions <text>] [--labels-per-item <n>]\n  orizu tasks assign --task <taskId> --assignees <userId1,userId2>\n  orizu tasks status --task <taskId> [--json]\n  orizu datasets upload --file <path> [--project <team/project>] [--name <name>]\n  orizu datasets download [--dataset <datasetId|datasetUrl>] [--project <team/project>] [--format <csv|json|jsonl>] [--out <path>]\n  orizu tasks export [--task <taskId>] [--format <csv|json|jsonl>] [--out <path>]`)
 }
 
 let cliArgs = process.argv.slice(2)
@@ -268,6 +282,16 @@ async function fetchApps(project: string): Promise<AppSummary[]> {
   return data.apps
 }
 
+async function fetchDatasets(project: string): Promise<DatasetSummary[]> {
+  const response = await authedFetch(`/api/cli/datasets?project=${encodeURIComponent(project)}`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch datasets: ${await response.text()}`)
+  }
+
+  const data = await parseJsonResponse<{ datasets: DatasetSummary[] }>(response, 'Datasets list')
+  return data.datasets
+}
+
 async function fetchTeamMembers(teamSlug: string): Promise<TeamMember[]> {
   const response = await authedFetch(`/api/cli/teams/${encodeURIComponent(teamSlug)}/members`)
   if (!response.ok) {
@@ -388,6 +412,26 @@ async function selectAppIdInteractively(projectArg: string | null): Promise<{ ap
 
   return {
     appId: app.id,
+    project,
+  }
+}
+
+async function selectDatasetInteractively(projectArg: string | null): Promise<{ datasetId: string; project: string }> {
+  let project = projectArg
+  if (!project) {
+    project = await resolveProjectSlug(null)
+  }
+
+  const datasets = await fetchDatasets(project)
+  const dataset = await promptSelect(
+    `Select a dataset in ${project}`,
+    datasets,
+    item => `${item.name} (id=${item.id}, rows=${item.rowCount})`,
+    { forcePrompt: true }
+  )
+
+  return {
+    datasetId: dataset.id,
     project,
   }
 }
@@ -1129,6 +1173,55 @@ async function uploadDataset() {
   }
 }
 
+function getDatasetDownloadInput(): string | null {
+  const fromFlag = getArg('--dataset')
+  if (fromFlag) {
+    return fromFlag
+  }
+
+  const positional = cliArgs[2]
+  if (positional && !positional.startsWith('--')) {
+    return positional
+  }
+
+  return null
+}
+
+async function downloadDataset() {
+  const projectArg = getArg('--project')
+  const datasetInput = getDatasetDownloadInput()
+  const format = (getArg('--format') || 'jsonl') as 'csv' | 'json' | 'jsonl'
+  const outPathArg = getArg('--out')
+
+  if (!['csv', 'json', 'jsonl'].includes(format)) {
+    throw new Error('format must be one of: csv, json, jsonl')
+  }
+
+  let datasetId: string
+  if (datasetInput) {
+    datasetId = parseDatasetReference(datasetInput).datasetId
+  } else {
+    const selected = await selectDatasetInteractively(projectArg)
+    datasetId = selected.datasetId
+  }
+
+  const response = await authedFetch(
+    `/api/cli/datasets/${encodeURIComponent(datasetId)}/download?format=${encodeURIComponent(format)}`
+  )
+  if (!response.ok) {
+    throw new Error(`Download failed: ${await response.text()}`)
+  }
+
+  const filename = outPathArg
+    ? expandHomePath(outPathArg)
+    : `${datasetId}.${format}`
+
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  writeFileSync(filename, bytes)
+
+  console.log(`Saved dataset ${datasetId} (${format.toUpperCase()}) to ${filename}`)
+}
+
 async function downloadAnnotations() {
   let taskId = getArg('--task')
   const format = (getArg('--format') || 'jsonl') as 'csv' | 'json' | 'jsonl'
@@ -1266,6 +1359,11 @@ async function main() {
 
   if (command === 'datasets' && subcommand === 'upload') {
     await uploadDataset()
+    return
+  }
+
+  if (command === 'datasets' && subcommand === 'download') {
+    await downloadDataset()
     return
   }
 

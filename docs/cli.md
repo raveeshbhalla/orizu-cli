@@ -11,7 +11,7 @@ The CLI supports:
 - Project management (list/create)
 - App management (list/create/update/link dataset)
 - Task management (list/create/assign/status/export)
-- Dataset upload (`csv`, `json`, `jsonl`)
+- Dataset management (upload/download: `csv`, `json`, `jsonl`)
 
 ## Prerequisites
 
@@ -238,6 +238,28 @@ Output:
 - dataset id
 - row count
 - dataset URL
+
+### Download dataset
+
+```bash
+orizu datasets download --dataset <datasetId|datasetUrl> --format jsonl --out ./dataset.jsonl
+```
+
+Supported formats:
+- `csv`
+- `json`
+- `jsonl` (default)
+
+Ways to identify the dataset:
+- `--dataset <datasetId>`
+- `--dataset <datasetUrl>` (for example `https://orizu.ai/d/team/project/datasets/<id>`)
+- positional dataset value: `orizu datasets download <datasetId-or-url>`
+
+Interactive fallback:
+- If `--dataset` (or positional value) is omitted, CLI prompts for:
+  1. team
+  2. project
+  3. dataset
 
 ## Tasks
 
