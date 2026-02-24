@@ -783,8 +783,8 @@ async function downloadAnnotations() {
     const filename = outPathArg
         ? expandHomePath(outPathArg)
         : fallbackName;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    writeFileSync(filename, buffer);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    writeFileSync(filename, bytes);
     console.log(`Saved ${format.toUpperCase()} export to ${filename}`);
 }
 async function main() {

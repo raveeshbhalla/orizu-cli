@@ -13,7 +13,7 @@ External users consume:
   - Mirrors `packages/cli`, `skills`, and CLI docs to one mirror repo `main`.
 - `.github/workflows/publish-cli.yml`
   - Triggered by tags matching `cli-vX.Y.Z` (or manual dispatch).
-  - Verifies `packages/cli/package.json` version matches tag.
+  - Sets `packages/cli/package.json` version from the release tag at publish time.
   - Builds and publishes `packages/cli` to npm.
   - Pushes `vX.Y.Z` tag to mirror repo.
 
@@ -26,14 +26,13 @@ Set these in this source repo:
 
 ## Release Process
 
-1. Bump `packages/cli/package.json` version.
-2. Merge to `main` (auto-sync mirrors runs).
-3. Create tag:
+1. Merge to `main` (auto-sync mirrors runs).
+2. Create tag:
    ```bash
-   git tag cli-v0.0.2
-   git push origin cli-v0.0.2
+   git tag cli-v0.0.3
+   git push origin cli-v0.0.3
    ```
-4. `publish-cli.yml` publishes npm and pushes `v0.0.2` to CLI mirror.
+3. `publish-cli.yml` publishes npm and pushes `v0.0.3` to CLI mirror.
 
 ## External Consumption
 

@@ -2,7 +2,7 @@ import { loadCredentials, saveCredentials } from './credentials.js'
 import { LoginResponse, StoredCredentials } from './types.js'
 
 export function getBaseUrl(): string {
-  return process.env.ORIZU_BASE_URL || 'http://localhost:3000'
+  return process.env.ORIZU_BASE_URL || 'https://orizu.ai'
 }
 
 function isExpired(expiresAt: number): boolean {

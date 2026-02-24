@@ -1,6 +1,6 @@
 import { loadCredentials, saveCredentials } from './credentials.js';
 export function getBaseUrl() {
-    return process.env.ORIZU_BASE_URL || 'http://localhost:3000';
+    return process.env.ORIZU_BASE_URL || 'https://orizu.ai';
 }
 function isExpired(expiresAt) {
     const nowUnix = Math.floor(Date.now() / 1000);

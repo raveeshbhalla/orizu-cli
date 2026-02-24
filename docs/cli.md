@@ -16,14 +16,24 @@ The CLI supports:
 ## Prerequisites
 
 - Node.js 20+
-- Running Orizu web app/API (default: `http://localhost:3000`)
+- Running Orizu web app/API (default: `https://orizu.ai`)
 - Valid Orizu account
 
 Optional environment variable:
 
 - `ORIZU_BASE_URL` (example: `https://your-orizu-domain.com`)
 
-If not set, CLI uses `http://localhost:3000`.
+If not set, CLI uses `https://orizu.ai`.
+
+Override examples:
+
+```bash
+# local development
+ORIZU_BASE_URL=http://localhost:3000 orizu login
+
+# preview branch / ephemeral deploy
+ORIZU_BASE_URL=https://<preview-domain> orizu login
+```
 
 ## Install / Build
 
@@ -342,4 +352,3 @@ The commands above will prompt for team/project/task selection where needed.
 - `tasks assign` accepts assignee user IDs, not emails.
 - Login flow currently expects localhost callback availability (`127.0.0.1:43123`).
 - CLI package publishing/distribution is separate from this usage doc (examples assume local build or installed binary).
-
