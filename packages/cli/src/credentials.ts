@@ -1,9 +1,12 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
-import { StoredCredentials } from './types.js'
+import { ServerCredentials, StoredCredentialsV1, StoredCredentialsV2 } from './types.js'
 
 function getConfigDir(): string {
+  if (process.env.ORIZU_CONFIG_DIR) {
+    return process.env.ORIZU_CONFIG_DIR
+  }
   return join(homedir(), '.config', 'orizu')
 }
 
@@ -11,25 +14,139 @@ function getCredentialsPath(): string {
   return join(getConfigDir(), 'credentials.json')
 }
 
-export function saveCredentials(credentials: StoredCredentials) {
+function isStoredCredentialsV2(value: unknown): value is StoredCredentialsV2 {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const typed = value as Partial<StoredCredentialsV2>
+  return typed.version === 2 && !!typed.servers && typeof typed.servers === 'object'
+}
+
+function isStoredCredentialsV1(value: unknown): value is StoredCredentialsV1 {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const typed = value as Partial<StoredCredentialsV1>
+  return (
+    typeof typed.baseUrl === 'string' &&
+    typeof typed.accessToken === 'string' &&
+    typeof typed.refreshToken === 'string' &&
+    typeof typed.expiresAt === 'number'
+  )
+}
+
+function migrateToV2(stored: StoredCredentialsV1): StoredCredentialsV2 {
+  return {
+    version: 2,
+    activeBaseUrl: stored.baseUrl,
+    servers: {
+      [stored.baseUrl]: {
+        accessToken: stored.accessToken,
+        refreshToken: stored.refreshToken,
+        expiresAt: stored.expiresAt,
+      },
+    },
+  }
+}
+
+function writeCredentials(config: StoredCredentialsV2) {
   const dir = getConfigDir()
   mkdirSync(dir, { recursive: true })
   const path = getCredentialsPath()
-  writeFileSync(path, JSON.stringify(credentials, null, 2), 'utf-8')
+  writeFileSync(path, JSON.stringify(config, null, 2), 'utf-8')
   chmodSync(path, 0o600)
 }
 
-export function loadCredentials(): StoredCredentials | null {
+function createEmptyCredentialsConfig(): StoredCredentialsV2 {
+  return {
+    version: 2 as const,
+    activeBaseUrl: null,
+    servers: {},
+  }
+}
+
+function loadCredentialsConfigForWrite(): StoredCredentialsV2 {
+  try {
+    return loadCredentialsConfig() || createEmptyCredentialsConfig()
+  } catch {
+    return createEmptyCredentialsConfig()
+  }
+}
+
+export function loadCredentialsConfig(): StoredCredentialsV2 | null {
   const path = getCredentialsPath()
   if (!existsSync(path)) {
     return null
   }
 
   const raw = readFileSync(path, 'utf-8')
-  return JSON.parse(raw) as StoredCredentials
+  const parsed = JSON.parse(raw) as unknown
+  if (isStoredCredentialsV2(parsed)) {
+    return parsed
+  }
+
+  if (isStoredCredentialsV1(parsed)) {
+    return migrateToV2(parsed)
+  }
+
+  throw new Error('Invalid credentials file format.')
 }
 
-export function clearCredentials() {
+export function getServerCredentials(baseUrl: string): ServerCredentials | null {
+  const config = loadCredentialsConfig()
+  if (!config) {
+    return null
+  }
+
+  if (!Object.hasOwn(config.servers, baseUrl)) {
+    return null
+  }
+
+  return config.servers[baseUrl] || null
+}
+
+export function saveServerCredentials(baseUrl: string, credentials: ServerCredentials) {
+  const config = loadCredentialsConfigForWrite()
+
+  config.servers[baseUrl] = credentials
+  config.activeBaseUrl = baseUrl
+  writeCredentials(config)
+}
+
+export function updateServerCredentials(baseUrl: string, credentials: ServerCredentials) {
+  const config = loadCredentialsConfigForWrite()
+  config.servers[baseUrl] = credentials
+  writeCredentials(config)
+}
+
+export function getActiveBaseUrl(): string | null {
+  const config = loadCredentialsConfig()
+  return config?.activeBaseUrl || null
+}
+
+export function setActiveBaseUrl(baseUrl: string | null) {
+  const config = loadCredentialsConfigForWrite()
+  config.activeBaseUrl = baseUrl
+  writeCredentials(config)
+}
+
+export function clearServerCredentials(baseUrl: string): boolean {
+  const config = loadCredentialsConfig()
+  if (!config || !Object.hasOwn(config.servers, baseUrl)) {
+    return false
+  }
+
+  delete config.servers[baseUrl]
+  if (config.activeBaseUrl === baseUrl) {
+    config.activeBaseUrl = null
+  }
+  writeCredentials(config)
+  return true
+}
+
+export function clearCredentialsFile() {
   const path = getCredentialsPath()
   if (existsSync(path)) {
     rmSync(path)

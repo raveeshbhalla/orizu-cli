@@ -6,9 +6,10 @@ import { readFileSync, writeFileSync } from 'fs'
 import { spawn } from 'child_process'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'process'
-import { clearCredentials, loadCredentials, saveCredentials } from './credentials.js'
+import { clearServerCredentials, getServerCredentials, saveServerCredentials } from './credentials.js'
 import { parseDatasetFile } from './file-parser.js'
-import { authedFetch, getBaseUrl } from './http.js'
+import { parseGlobalFlags } from './global-flags.js'
+import { authedFetch, getBaseUrl, setGlobalFlags } from './http.js'
 import { LoginResponse } from './types.js'
 
 interface Team {
@@ -91,16 +92,18 @@ interface TaskStatusPayload {
 }
 
 function printUsage() {
-  console.log(`orizu commands:\n\n  orizu login\n  orizu logout\n  orizu whoami\n  orizu teams list\n  orizu teams create [--name <name>]\n  orizu teams members list [--team <teamSlug>]\n  orizu teams members add --email <email> [--team <teamSlug>]\n  orizu teams members remove --email <email> [--team <teamSlug>]\n  orizu teams members role --team <teamSlug> --email <email> --role <admin|member>\n  orizu projects list [--team <teamSlug>]\n  orizu projects create --name <name> [--team <teamSlug>]\n  orizu apps list [--project <team/project>]\n  orizu apps create --project <team/project> --name <name> --dataset <datasetId> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps update [--app <appId>] [--project <team/project>] --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps link-dataset --dataset <datasetId> [--app <appId>] [--project <team/project>] [--version <n>]\n  orizu tasks list [--project <team/project>]\n  orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> --assignees <userId1,userId2> [--instructions <text>] [--labels-per-item <n>]\n  orizu tasks assign --task <taskId> --assignees <userId1,userId2>\n  orizu tasks status --task <taskId> [--json]\n  orizu datasets upload --file <path> [--project <team/project>] [--name <name>]\n  orizu tasks export [--task <taskId>] [--format <csv|json|jsonl>] [--out <path>]`)
+  console.log(`orizu global options:\n\n  --local                 Use http://localhost:3000\n  --server <url>          Use a specific server origin (for example: https://preview.example.com)\n\norizu commands:\n\n  orizu login\n  orizu logout\n  orizu whoami\n  orizu teams list\n  orizu teams create [--name <name>]\n  orizu teams members list [--team <teamSlug>]\n  orizu teams members add --email <email> [--team <teamSlug>]\n  orizu teams members remove --email <email> [--team <teamSlug>]\n  orizu teams members role --team <teamSlug> --email <email> --role <admin|member>\n  orizu projects list [--team <teamSlug>]\n  orizu projects create --name <name> [--team <teamSlug>]\n  orizu apps list [--project <team/project>]\n  orizu apps create --project <team/project> --name <name> --dataset <datasetId> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps update [--app <appId>] [--project <team/project>] --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps link-dataset --dataset <datasetId> [--app <appId>] [--project <team/project>] [--version <n>]\n  orizu tasks list [--project <team/project>]\n  orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> --assignees <userId1,userId2> [--instructions <text>] [--labels-per-item <n>]\n  orizu tasks assign --task <taskId> --assignees <userId1,userId2>\n  orizu tasks status --task <taskId> [--json]\n  orizu datasets upload --file <path> [--project <team/project>] [--name <name>]\n  orizu tasks export [--task <taskId>] [--format <csv|json|jsonl>] [--out <path>]`)
 }
 
+let cliArgs = process.argv.slice(2)
+
 function getArg(name: string): string | null {
-  const index = process.argv.indexOf(name)
-  if (index === -1 || index + 1 >= process.argv.length) {
+  const index = cliArgs.indexOf(name)
+  if (index === -1 || index + 1 >= cliArgs.length) {
     return null
   }
 
-  return process.argv[index + 1]
+  return cliArgs[index + 1]
 }
 
 function isInteractiveTerminal() {
@@ -108,7 +111,7 @@ function isInteractiveTerminal() {
 }
 
 function hasArg(name: string): boolean {
-  return process.argv.includes(name)
+  return cliArgs.includes(name)
 }
 
 function expandHomePath(path: string): string {
@@ -618,11 +621,10 @@ async function login() {
   }
 
   const loginData = await parseJsonResponse<LoginResponse>(exchangeResponse, 'CLI auth exchange')
-  saveCredentials({
+  saveServerCredentials(baseUrl, {
     accessToken: loginData.accessToken,
     refreshToken: loginData.refreshToken,
     expiresAt: loginData.expiresAt,
-    baseUrl,
   })
 
   console.log(`Logged in as ${loginData.user.email ?? loginData.user.id}`)
@@ -639,21 +641,22 @@ async function whoami() {
 }
 
 async function logout() {
-  const credentials = loadCredentials()
+  const baseUrl = getBaseUrl()
+  const credentials = getServerCredentials(baseUrl)
   if (!credentials) {
-    console.log('Already logged out.')
+    console.log(`Already logged out for ${baseUrl}.`)
     return
   }
 
-  await fetch(`${credentials.baseUrl}/api/cli/auth/logout`, {
+  await fetch(`${baseUrl}/api/cli/auth/logout`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${credentials.accessToken}`,
     },
   }).catch(() => undefined)
 
-  clearCredentials()
-  console.log('Logged out.')
+  clearServerCredentials(baseUrl)
+  console.log(`Logged out from ${baseUrl}.`)
 }
 
 async function listTeams() {
@@ -1156,8 +1159,12 @@ async function downloadAnnotations() {
 }
 
 async function main() {
-  const command = process.argv[2]
-  const subcommand = process.argv[3]
+  const parsed = parseGlobalFlags(process.argv.slice(2))
+  setGlobalFlags(parsed.flags)
+  cliArgs = parsed.args
+
+  const command = cliArgs[0]
+  const subcommand = cliArgs[1]
 
   if (!command) {
     printUsage()
@@ -1189,7 +1196,7 @@ async function main() {
     return
   }
 
-  const teamsMembersAction = process.argv[4]
+  const teamsMembersAction = cliArgs[2]
   if (command === 'teams' && subcommand === 'members' && teamsMembersAction === 'list') {
     await listTeamMembers()
     return
