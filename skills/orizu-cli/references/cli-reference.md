@@ -45,6 +45,7 @@ Create from file:
 orizu apps create \
   --project my-team/quality-eval \
   --name "Labeling App" \
+  --dataset <datasetId> \
   --file ./apps/LabelingApp.tsx \
   --input-schema ./schemas/input.json \
   --output-schema ./schemas/output.json
@@ -92,6 +93,7 @@ orizu tasks create \
   --dataset <datasetId> \
   --app <appId> \
   --title "Round 1 labeling" \
+  --assignees <userId1,userId2> \
   --instructions "Follow rubric v1" \
   --labels-per-item 2
 ```
@@ -133,14 +135,16 @@ orizu login
 orizu teams create --name "Ops Eval"
 orizu projects create --name "Support QA" --team ops-eval
 
+orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
+
 orizu apps create \
   --project ops-eval/support-qa \
   --name "Support Labeler" \
+  --dataset <datasetId> \
   --file ./apps/SupportLabeler.tsx \
   --input-schema ./schemas/support-input.json \
   --output-schema ./schemas/support-output.json
 
-orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
 orizu apps link-dataset --app <appId> --dataset <datasetId>
 
 orizu tasks create \
@@ -148,6 +152,7 @@ orizu tasks create \
   --dataset <datasetId> \
   --app <appId> \
   --title "Support QA Round 1" \
+  --assignees <userId1,userId2> \
   --labels-per-item 2
 
 orizu tasks status --task <taskId>
@@ -168,5 +173,6 @@ Use these shortcuts only in TTY environments where prompts can run.
 ## Notes and Limits
 
 - `tasks assign` expects user IDs, not emails.
+- `tasks create` requires `--assignees` and creates assignments at creation time.
 - Login currently requires callback availability on `127.0.0.1:43123`.
 - In non-interactive contexts, pass explicit selection flags.

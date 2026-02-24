@@ -91,7 +91,7 @@ interface TaskStatusPayload {
 }
 
 function printUsage() {
-  console.log(`orizu commands:\n\n  orizu login\n  orizu logout\n  orizu whoami\n  orizu teams list\n  orizu teams create [--name <name>]\n  orizu teams members list [--team <teamSlug>]\n  orizu teams members add --email <email> [--team <teamSlug>]\n  orizu teams members remove --email <email> [--team <teamSlug>]\n  orizu teams members role --team <teamSlug> --email <email> --role <admin|member>\n  orizu projects list [--team <teamSlug>]\n  orizu projects create --name <name> [--team <teamSlug>]\n  orizu apps list [--project <team/project>]\n  orizu apps create --project <team/project> --name <name> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps update [--app <appId>] [--project <team/project>] --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps link-dataset --dataset <datasetId> [--app <appId>] [--project <team/project>] [--version <n>]\n  orizu tasks list [--project <team/project>]\n  orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> [--instructions <text>] [--labels-per-item <n>]\n  orizu tasks assign --task <taskId> --assignees <userId1,userId2>\n  orizu tasks status --task <taskId> [--json]\n  orizu datasets upload --file <path> [--project <team/project>] [--name <name>]\n  orizu tasks export [--task <taskId>] [--format <csv|json|jsonl>] [--out <path>]`)
+  console.log(`orizu commands:\n\n  orizu login\n  orizu logout\n  orizu whoami\n  orizu teams list\n  orizu teams create [--name <name>]\n  orizu teams members list [--team <teamSlug>]\n  orizu teams members add --email <email> [--team <teamSlug>]\n  orizu teams members remove --email <email> [--team <teamSlug>]\n  orizu teams members role --team <teamSlug> --email <email> --role <admin|member>\n  orizu projects list [--team <teamSlug>]\n  orizu projects create --name <name> [--team <teamSlug>]\n  orizu apps list [--project <team/project>]\n  orizu apps create --project <team/project> --name <name> --dataset <datasetId> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps update [--app <appId>] [--project <team/project>] --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]\n  orizu apps link-dataset --dataset <datasetId> [--app <appId>] [--project <team/project>] [--version <n>]\n  orizu tasks list [--project <team/project>]\n  orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> --assignees <userId1,userId2> [--instructions <text>] [--labels-per-item <n>]\n  orizu tasks assign --task <taskId> --assignees <userId1,userId2>\n  orizu tasks status --task <taskId> [--json]\n  orizu datasets upload --file <path> [--project <team/project>] [--name <name>]\n  orizu tasks export [--task <taskId>] [--format <csv|json|jsonl>] [--out <path>]`)
 }
 
 function getArg(name: string): string | null {
@@ -783,13 +783,14 @@ function readJsonFile(pathArg: string): Record<string, unknown> {
 async function createAppFromFile() {
   const project = getArg('--project')
   const name = getArg('--name')
+  const datasetId = getArg('--dataset')
   const filePath = getArg('--file')
   const inputSchemaPath = getArg('--input-schema')
   const outputSchemaPath = getArg('--output-schema')
   const component = getArg('--component') || undefined
 
-  if (!project || !name || !filePath || !inputSchemaPath || !outputSchemaPath) {
-    throw new Error('Usage: orizu apps create --project <team/project> --name <name> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]')
+  if (!project || !name || !datasetId || !filePath || !inputSchemaPath || !outputSchemaPath) {
+    throw new Error('Usage: orizu apps create --project <team/project> --name <name> --dataset <datasetId> --file <path> --input-schema <json-path> --output-schema <json-path> [--component <name>]')
   }
 
   const sourceCode = readSourceFile(filePath)
@@ -801,6 +802,7 @@ async function createAppFromFile() {
     body: JSON.stringify({
       projectSlug: project,
       name,
+      datasetId,
       sourceCode,
       componentName: component,
       inputJsonSchema,
@@ -922,12 +924,13 @@ async function createTask() {
   const datasetId = getArg('--dataset')
   const appId = getArg('--app')
   const title = getArg('--title')
+  const assignees = parseCommaSeparated(getArg('--assignees'))
   const instructions = getArg('--instructions')
   const labelsPerItemArg = getArg('--labels-per-item')
   const labelsPerItem = labelsPerItemArg ? Number(labelsPerItemArg) : 1
 
-  if (!projectSlug || !datasetId || !appId || !title) {
-    throw new Error('Usage: orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> [--instructions <text>] [--labels-per-item <n>]')
+  if (!projectSlug || !datasetId || !appId || !title || assignees.length === 0) {
+    throw new Error('Usage: orizu tasks create --project <team/project> --dataset <datasetId> --app <appId> --title <title> --assignees <userId1,userId2> [--instructions <text>] [--labels-per-item <n>]')
   }
 
   const response = await authedFetch('/api/cli/tasks', {
@@ -938,6 +941,7 @@ async function createTask() {
       datasetId,
       appId,
       title,
+      memberIds: assignees,
       instructions,
       requiredAssignmentsPerRow: labelsPerItem,
     }),
@@ -949,9 +953,10 @@ async function createTask() {
 
   const data = await parseJsonResponse<{
     task: { id: string; title: string; status: string; requiredAssignmentsPerRow: number }
+    assignmentsCreated: number
   }>(response, 'Task create')
   console.log(
-    `Created task ${data.task.title} (${data.task.id}) [${data.task.status}], labels/item=${data.task.requiredAssignmentsPerRow}`
+    `Created task ${data.task.title} (${data.task.id}) [${data.task.status}], labels/item=${data.task.requiredAssignmentsPerRow}, assignments=${data.assignmentsCreated}`
   )
 }
 

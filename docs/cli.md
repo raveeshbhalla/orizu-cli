@@ -174,6 +174,7 @@ Interactive fallback:
 orizu apps create \
   --project my-team/quality-eval \
   --name "Labeling App" \
+  --dataset <datasetId> \
   --file ./apps/LabelingApp.tsx \
   --input-schema ./schemas/input.json \
   --output-schema ./schemas/output.json
@@ -185,6 +186,7 @@ Optional:
 Requirements:
 - Source file must pass component contract validation.
 - `input-schema` and `output-schema` are required JSON object files.
+- `--dataset` is required and must reference a dataset in the same project.
 
 ### Update app from file (new version)
 
@@ -254,9 +256,14 @@ orizu tasks create \
   --dataset <datasetId> \
   --app <appId> \
   --title "Round 1 labeling" \
+  --assignees <userId1,userId2> \
   --instructions "Follow rubric v1" \
   --labels-per-item 2
 ```
+
+Task creation behavior:
+- `--assignees` is required.
+- Assignments are created immediately during `tasks create`.
 
 ### Assign task
 
@@ -297,21 +304,22 @@ Defaults:
 
 ## End-to-End Examples
 
-### Example 1: New Team -> Project -> App -> Dataset -> Task
+### Example 1: New Team -> Project -> Dataset -> App -> Task
 
 ```bash
 orizu login
 orizu teams create --name "Ops Eval"
 orizu projects create --name "Support QA" --team ops-eval
 
+orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
+
 orizu apps create \
   --project ops-eval/support-qa \
   --name "Support Labeler" \
+  --dataset <datasetId> \
   --file ./apps/SupportLabeler.tsx \
   --input-schema ./schemas/support-input.json \
   --output-schema ./schemas/support-output.json
-
-orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
 
 # Link app version to dataset for preview behavior
 orizu apps link-dataset --app <appId> --dataset <datasetId>
@@ -321,6 +329,7 @@ orizu tasks create \
   --dataset <datasetId> \
   --app <appId> \
   --title "Support QA Round 1" \
+  --assignees <userId1,userId2> \
   --labels-per-item 2
 
 orizu tasks status --task <taskId>
@@ -346,6 +355,8 @@ The commands above will prompt for team/project/task selection where needed.
   - For required selections, provide explicit flags (team/project/app/task).
 - Validation errors:
   - App create/update rejects invalid component contract and invalid schema files.
+  - App create requires `--dataset`.
+  - Task create requires `--assignees`.
 
 ## Current Limitations
 

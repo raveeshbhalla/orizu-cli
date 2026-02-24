@@ -34,23 +34,27 @@ Prefer explicit flags in automation and CI; use interactive prompts only in TTY 
    orizu teams create --name "Ops Eval"
    orizu projects create --name "Support QA" --team ops-eval
    ```
-3. Create or update app from file:
+3. Upload dataset:
+   ```bash
+   orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
+   ```
+4. Create or update app from file (dataset is required):
    ```bash
    orizu apps create \
      --project ops-eval/support-qa \
      --name "Support Labeler" \
+     --dataset <datasetId> \
      --file ./apps/SupportLabeler.tsx \
      --input-schema ./schemas/support-input.json \
      --output-schema ./schemas/support-output.json
    ```
-4. Upload dataset and optionally link dataset to app version:
+5. Optionally link a different dataset to an existing app version:
    ```bash
-   orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
    orizu apps link-dataset --app <appId> --dataset <datasetId>
    ```
-5. Run task lifecycle:
+6. Run task lifecycle (task create requires assignees and creates assignments immediately):
    ```bash
-   orizu tasks create --project ops-eval/support-qa --dataset <datasetId> --app <appId> --title "Support QA Round 1"
+   orizu tasks create --project ops-eval/support-qa --dataset <datasetId> --app <appId> --title "Support QA Round 1" --assignees <userId1,userId2>
    orizu tasks status --task <taskId>
    orizu tasks export --task <taskId> --format csv --out ./support-round1.csv
    ```
@@ -59,7 +63,7 @@ Prefer explicit flags in automation and CI; use interactive prompts only in TTY 
 
 - Use interactive fallback only when running in a TTY and flags are omitted.
 - Provide explicit identifiers in scripts/CI:
-  - `--team`, `--project`, `--app`, `--task`, `--dataset`.
+  - `--team`, `--project`, `--app`, `--task`, `--dataset`, `--assignees`.
 - For `tasks assign`, pass user IDs (comma-separated), not emails.
 - Export defaults:
   - `--format` defaults to `jsonl`.
