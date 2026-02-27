@@ -1,6 +1,6 @@
 ---
 name: orizu-cli
-description: Operate and troubleshoot the Orizu CLI for authentication and workspace operations. Use when Codex must run or explain `orizu` commands for login/logout/whoami, team and member management, project/app lifecycle, dataset upload (`csv`/`json`/`jsonl`), and task lifecycle (create/assign/status/export), including interactive selection fallbacks and non-interactive flag requirements.
+description: Operate and troubleshoot the Orizu CLI for authentication and workspace operations. Use when Codex must run or explain `orizu` commands for login/logout/whoami, team and member management, project/app lifecycle, dataset upload/download/append/delete-rows (`csv`/`json`/`jsonl`), and task lifecycle (create/assign/status/export), including interactive selection fallbacks and non-interactive flag requirements.
 ---
 
 # Orizu CLI
@@ -38,7 +38,15 @@ Prefer explicit flags in automation and CI; use interactive prompts only in TTY 
    ```bash
    orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
    ```
-4. Create or update app from file (dataset is required):
+4. Optionally append new rows later:
+   ```bash
+   orizu datasets append --dataset <datasetId> --file ./datasets/support-additional.jsonl
+   ```
+5. Optionally delete incorrect rows:
+   ```bash
+   orizu datasets delete-rows --dataset <datasetId> --row-ids <rowId1,rowId2>
+   ```
+6. Create or update app from file (dataset is required):
    ```bash
    orizu apps create \
      --project ops-eval/support-qa \
@@ -48,11 +56,11 @@ Prefer explicit flags in automation and CI; use interactive prompts only in TTY 
      --input-schema ./schemas/support-input.json \
      --output-schema ./schemas/support-output.json
    ```
-5. Optionally link a different dataset to an existing app version:
+7. Optionally link a different dataset to an existing app version:
    ```bash
    orizu apps link-dataset --app <appId> --dataset <datasetId>
    ```
-6. Run task lifecycle (task create requires assignees and creates assignments immediately):
+8. Run task lifecycle (task create requires assignees and creates assignments immediately):
    ```bash
    orizu tasks create --project ops-eval/support-qa --dataset <datasetId> --app <appId> --title "Support QA Round 1" --assignees <userId1,userId2>
    orizu tasks status --task <taskId>
@@ -68,6 +76,9 @@ Prefer explicit flags in automation and CI; use interactive prompts only in TTY 
 - Export defaults:
   - `--format` defaults to `jsonl`.
   - output defaults to `<taskId>.<format>`.
+- Dataset row mutation:
+  - `datasets append` accepts `--file` in `.csv`, `.json`, or `.jsonl`.
+  - `datasets delete-rows` requires at least one of `--row-ids` or `--row-indices`.
 
 ## Auth and Error Handling
 
@@ -82,7 +93,7 @@ Prefer explicit flags in automation and CI; use interactive prompts only in TTY 
 - Teams: list/create, members list/add/remove/role
 - Projects: list/create
 - Apps: list/create/update/link-dataset
-- Datasets: upload (`.csv`, `.json`, `.jsonl`)
+- Datasets: upload/download/append/delete-rows (`.csv`, `.json`, `.jsonl`)
 - Tasks: list/create/assign/status/export
 
 ## References

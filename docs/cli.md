@@ -11,7 +11,7 @@ The CLI supports:
 - Project management (list/create)
 - App management (list/create/update/link dataset)
 - Task management (list/create/assign/status/export)
-- Dataset management (upload/download: `csv`, `json`, `jsonl`)
+- Dataset management (upload/download/append/delete rows: `csv`, `json`, `jsonl`)
 
 ## Prerequisites
 
@@ -260,6 +260,39 @@ Interactive fallback:
   1. team
   2. project
   3. dataset
+
+### Append dataset rows
+
+```bash
+orizu datasets append --dataset <datasetId|datasetUrl> --file ./new-rows.jsonl
+```
+
+Supported file types:
+- `.csv`
+- `.json` (array of objects)
+- `.jsonl` (one object per line)
+
+Behavior:
+- Appends rows to the end of the dataset.
+- Auto-generates `id` for any appended row that does not include one.
+
+Interactive fallback:
+- If `--dataset` is omitted, CLI prompts for team/project/dataset.
+
+### Delete dataset rows
+
+```bash
+orizu datasets delete-rows --dataset <datasetId|datasetUrl> --row-ids row-1,row-2
+orizu datasets delete-rows --dataset <datasetId|datasetUrl> --row-indices 0,4,7
+```
+
+Requirements:
+- Provide at least one selector:
+  - `--row-ids <id1,id2>`
+  - `--row-indices <n1,n2>`
+
+Interactive fallback:
+- If `--dataset` is omitted, CLI prompts for team/project/dataset.
 
 ## Tasks
 

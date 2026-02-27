@@ -71,12 +71,20 @@ orizu apps link-dataset --app <appId> --dataset <datasetId>
 
 ```bash
 orizu datasets upload --file ./data.csv --project my-team/quality-eval --name "Batch 1"
+orizu datasets download --dataset <datasetId|datasetUrl> --format jsonl --out ./dataset.jsonl
+orizu datasets append --dataset <datasetId|datasetUrl> --file ./new-rows.jsonl
+orizu datasets delete-rows --dataset <datasetId|datasetUrl> --row-ids row-1,row-2
+orizu datasets delete-rows --dataset <datasetId|datasetUrl> --row-indices 0,4,7
 ```
 
 Supported file types:
 - `.csv`
 - `.json` (array of objects)
 - `.jsonl` (one object per line)
+
+Delete rows selectors:
+- `--row-ids <id1,id2>`
+- `--row-indices <n1,n2>`
 
 ### Tasks
 
@@ -136,6 +144,8 @@ orizu teams create --name "Ops Eval"
 orizu projects create --name "Support QA" --team ops-eval
 
 orizu datasets upload --project ops-eval/support-qa --file ./datasets/support.jsonl --name "Support Batch 1"
+orizu datasets append --dataset <datasetId> --file ./datasets/support-extra.jsonl
+orizu datasets delete-rows --dataset <datasetId> --row-indices 10,11
 
 orizu apps create \
   --project ops-eval/support-qa \
@@ -174,5 +184,6 @@ Use these shortcuts only in TTY environments where prompts can run.
 
 - `tasks assign` expects user IDs, not emails.
 - `tasks create` requires `--assignees` and creates assignments at creation time.
+- `datasets delete-rows` requires at least one of `--row-ids` or `--row-indices`.
 - Login currently requires callback availability on `127.0.0.1:43123`.
 - In non-interactive contexts, pass explicit selection flags.
