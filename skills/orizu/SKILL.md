@@ -56,7 +56,7 @@ Keep datasets, labels, judges, runners, scorers, instruction-set profiles, optim
 ## Shared references
 
 - `references/vocabulary.md` — canonical workflow, artifact, quick-win, and flow vocabulary; reuse its wording verbatim.
-- `references/primer.md` — the evals-first method and why each stage exists.
+- `references/primer.md` — the eval-driven method and why each stage exists.
 - `references/assess-and-plan.md` — repo inventory, quick-win selection, plan conversation, and durable plan artifact.
 - `references/cli-reference.md` — current command surface, setup, output semantics, limits, and execution facts.
 - `references/authority-map.md` — the single source of truth for who executes each action and exact hand-offs.

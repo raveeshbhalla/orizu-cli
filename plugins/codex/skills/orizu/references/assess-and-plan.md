@@ -1,6 +1,6 @@
 # Assess & plan
 
-This reference turns evidence from the customer's codebase into an evals-first improvement plan. It ends before dataset construction: the durable exit artifact is a human-ratified `improvement-plan.md` written to the canonical path in section 7 and committed before data access.
+This reference turns evidence from the customer's codebase into an eval-driven improvement plan. It ends before dataset construction: the durable exit artifact is a human-ratified `improvement-plan.md` written to the canonical path in section 7 and committed before data access.
 
 ## 1. Hold the data boundary
 

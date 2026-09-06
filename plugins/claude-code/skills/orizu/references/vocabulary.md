@@ -4,7 +4,7 @@ Use these terms exactly across Orizu's method, skill, references, and reports.
 
 ## Workflow vocabulary
 
-- **Evals-first** — understand observed failures, build and validate evaluations, then optimize the LLM application against that evidence.
+- **Eval-driven** — understand observed failures, build and validate evaluations, then optimize the LLM application against that evidence.
 - **Exit criterion** — the checkable evidence required before leaving one flow or ordered stage for the next.
 - **Human-only** — an action the agent prepares with exact evidence and an authorized human executes.
 - **Local surface** — a CLI action executed under the user's token; the authority map, not the surface, determines whether an agent or human executes it.
